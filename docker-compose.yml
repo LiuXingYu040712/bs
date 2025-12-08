@@ -1,0 +1,50 @@
+ 
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE=http://localhost:8080
+      - CHOKIDAR_USEPOLLING=1
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    depends_on:
+      - server
+      - qdrant
+
+  server:
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -lc "if [ ! -d node_modules ]; then apk add --no-cache python3 make g++ && npm ci --no-audit --no-fund; elif [ ! -x node_modules/.bin/nodemon ]; then npm install --no-audit --no-fund --include=dev; fi; node_modules/.bin/nodemon --legacy-watch server/index.js"
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_AUTO_RECREATE=true
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DB_SEED_ON_STARTUP=false
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+volumes:
+  qdrant_storage:
+
