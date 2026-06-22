@@ -1,19 +1,136 @@
 # Admin Management System (HR + AI + RAG)
 
-本项目是一个基于 React + Vite 的人事管理系统，并集成了基于 RAG 的 AI 助手与知识库管理（Mock 后端）。
+本项目是一个基于 React + Vite 的人事管理系统，并集成了基于 RAG 的 AI 助手与知识库管理（Python FastAPI + Qdrant，经 Node 代理）。
 
 ## 结构
 - 前端：`Vite + React + Ant Design`
-- 后端（Mock）：`Express` 提供基础接口（RAG 配置 / 知识库 / 聊天）
-- 容器：`Dockerfile`、`docker-compose.yml` 支持前后端一键启动
+- 主后端：`Express`（鉴权、人事业务、知识库元数据、API 网关）
+- RAG 微服务：`Python + FastAPI + LangChain`（文档切分、向量化、检索、LLM 生成）
+- 向量库：`Qdrant`
+- 容器：`Dockerfile`、`docker-compose.yml` + `scripts/docker-start.ps1` 支持一键启动
+
+## 一键启动（推荐）
+
+先打开 **Docker Desktop**，然后在项目根目录：
+
+```powershell
+cd D:\bs\liu
+.\start.cmd              # 公网 + 本地（Docker 四服务 + Tunnel 后台）
+.\start.cmd -Build       # 改代码后重建镜像
+.\start.cmd -Local       # 仅本地开发（API 走 localhost:8080）
+.\start.cmd -Down        # 停止全部
+```
+
+| 脚本 | 用途 |
+|------|------|
+| **`start.cmd`** | **公网一键**（生产前端 + API 域名 + Tunnel） |
+| `scripts\docker-start.cmd` | 本地 Docker（dev 前端，localhost API） |
+| `scripts\deploy-prod.cmd` | 仅 Docker 生产栈（不自动开 Tunnel） |
+
+## 运行（Docker 本地开发）
+
+**前置条件**：已安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+```powershell
+cd D:\bs\liu
+
+# 1. 配置密钥（首次）
+copy .env.example .env
+# 编辑 .env，填入 DASHSCOPE_API_KEY
+
+# 2. 一键启动（推荐，Windows 用 .cmd 避免执行策略报错）
+.\scripts\docker-start.cmd
+
+# 若直接运行 .ps1 报「禁止运行脚本」，改用：
+# powershell -ExecutionPolicy Bypass -File .\scripts\docker-start.ps1
+
+# 或手动
+docker compose up --build -d
+```
+
+启动后访问：
+
+| 服务 | 地址 |
+|------|------|
+| 前端 | http://localhost:3000 |
+| Node API | http://localhost:8080 |
+| Qdrant 面板 | http://localhost:6333/dashboard |
+
+Python RAG（8000）默认仅 Docker 内网访问，经 Node 代理；本地调试可在 `docker-compose.yml` 中取消 `rag_service` 的 `ports` 注释。
+
+## 公网部署（Cloudflare Tunnel）
+
+域名：`app.liuxingyu.fun`（前端）、`api.liuxingyu.fun`（API），配置见 `deploy/cloudflared/config.yml`。
+
+**在部署机器上（需已安装 Docker + cloudflared，并完成 tunnel 凭证 `deploy/cloudflared/qdrant.json`）：**
+
+```powershell
+cd D:\bs\liu
+copy .env.example .env
+# 编辑 .env：填入 DASHSCOPE_API_KEY
+
+# 1. 启动生产四服务（nginx 静态前端 + API 指向 https://api.liuxingyu.fun）
+.\scripts\deploy-prod.cmd -Build
+
+# 2. 启动 Cloudflare Tunnel（映射 3000/8080/6333 到公网域名）
+.\scripts\deploy-prod.cmd -Tunnel
+```
+
+或分两步：先 `deploy-prod.cmd -Build`，另开终端：
+
+```powershell
+cloudflared tunnel --config deploy/cloudflared/config.yml run
+```
+
+验证：
+
+- https://app.liuxingyu.fun
+- https://api.liuxingyu.fun/api/health
+
+停止：`.\scripts\deploy-prod.cmd -Down`
+
+默认管理员：`admin` / `admin123`（首次启动自动创建）
+
+常用命令：
+
+```powershell
+.\scripts\docker-start.ps1 -Logs    # 查看日志
+.\scripts\docker-start.ps1 -Down    # 停止并移除容器
+.\scripts\docker-start.ps1 -Dev       # 开发模式（源码热更新）
+```
+
+或使用 npm 脚本：
+
+```powershell
+npm run docker:up
+npm run docker:logs
+npm run docker:down
+npm run docker:dev
+```
+
+数据持久化：`server_data`（SQLite）、`qdrant_storage`（向量库）Docker 卷，重启不丢失。
 
 ## 运行（本地）
 ```powershell
-cd "c:\Users\刘星宇\Desktop\新建文件夹 (3)"
+cd "d:\bs\liu"
 npm install
-# 启动后端
+
+# 1) 启动 Qdrant（若未运行）
+docker run -p 6333:6333 qdrant/qdrant
+
+# 2) 启动 Python RAG 服务
+cd rag_service
+python -m pip install -r requirements.txt
+$env:QDRANT_URL="http://localhost:6333"
+$env:DASHSCOPE_API_KEY="your_key"
+python -m uvicorn app.main:app --reload --port 8000
+
+# 3) 启动 Node 主后端（另开终端）
+cd ..
+$env:RAG_SERVICE_URL="http://localhost:8000"
 npm run dev:server
-# 另开一个终端，启动前端
+
+# 4) 启动前端（另开终端）
 npm run dev
 ```
 
@@ -23,26 +140,31 @@ npm run dev:all
 ```
 
 访问：
-- 前端：`http://localhost:3000`（Vite 实际端口以输出为准）
-- 后端：`http://localhost:8080`
+- 前端：`http://localhost:3000`
+- Node API：`http://localhost:8080`
+- Python RAG：`http://localhost:8000`
 
-## 运行（Docker Compose）
-```powershell
-cd "c:\Users\刘星宇\Desktop\新建文件夹 (3)"
-docker compose up --build
-```
-
-## 前端对接后端
-- 配置环境变量：`VITE_API_BASE`（Dockerfile 默认 `http://localhost:8080`）
+- 配置环境变量：`VITE_API_BASE`（指向 Node 主后端，默认 `http://localhost:8080`）
+- RAG 代理：`RAG_SERVICE_URL`（**必填**，Node 所有 RAG 操作均代理至 Python，默认 `http://localhost:8000`）
 - API 封装：`src/api/client.js`
 	- `chat(question)`：AI 助手聊天接口
 	- `getRagConfig()` / `saveRagConfig(cfg)`：RAG 配置读取与保存
 	- `listKnowledgeDocs()`：知识库文档列表
 
 ## 后续扩展
-- 接入真实向量数据库（Qdrant/Milvus）与嵌入模型（OpenAI/自研）
-- 为 `EmployeeManagement` 页面接入后端增删改查接口与持久化
+- ~~接入真实向量数据库（Qdrant/Milvus）与嵌入模型~~（已通过 Python RAG 服务 + Qdrant 实现）
+- ~~RAG 后端迁移至 Python FastAPI + LangChain~~（已完成，Node 通过 `RAG_SERVICE_URL` 代理）
+- 为 `EmployeeManagement` 页面接入后端增删改查接口与持久化（已基本完成）
 - 增加 `.env` 管理密钥与配置、安全与鉴权
+ 
+## 默认管理员 (开发用)
+
+项目会在首次启动时尝试在 SQLite 中创建一个管理员账户。可通过环境变量覆盖：
+
+- `ADMIN_USERNAME`（默认 `admin`）
+- `ADMIN_PASSWORD`（默认 `admin123`）
+
+若不设置，种子账号会以 `admin / admin123` 创建（仅用于本地开发，请上线前修改）。
 # AI人事管理系统
 
 一个基于 React + Vite + Ant Design 构建的现代化人事管理系统，集成大模型与RAG技术，提供智能人事管理服务。

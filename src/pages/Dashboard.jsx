@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Row, Col, Card, Statistic, Table, Tag, Progress, Typography, Avatar, Space, Badge } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { Row, Col, Card, Statistic, Table, Tag, Progress, Typography, Avatar, Space, Badge, Button } from 'antd'
 import {
   ArrowUpOutlined,
   TeamOutlined,
@@ -22,17 +23,19 @@ const Dashboard = () => {
     totalEmployees: 0,
     recentEmployees: [],
     departments: [],
-    rag: { todaySearchCount: 0, knowledgeDocs: 0, vectorIndexTotal: 0, avgResponseTime: null },
+    rag: { todaySearchCount: 0, knowledgeDocs: 0, vectorIndexTotal: 0 },
     todayAttendanceRate: null,
     recruitmentOpenPositions: null,
     salaryTotalCurrentMonth: null,
   })
+  const [positions, setPositions] = useState([])
+  const navigate = useNavigate()
 
   useEffect(() => {
     let mounted = true
     import('../api/client')
-      .then(({ getDashboardSummary }) => getDashboardSummary())
-      .then((data) => {
+      .then(({ getDashboardSummary, listPositions }) => Promise.all([getDashboardSummary(), listPositions()]))
+      .then(([data, pos]) => {
         if (!mounted) return
         setSummary({
           totalEmployees: data.totalEmployees ?? 0,
@@ -43,6 +46,7 @@ const Dashboard = () => {
           recruitmentOpenPositions: data.recruitmentOpenPositions ?? null,
           salaryTotalCurrentMonth: data.salaryTotalCurrentMonth ?? null,
         })
+        setPositions((pos || []).map((p) => ({ ...p, key: p.id })))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -110,10 +114,6 @@ const Dashboard = () => {
         <Title level={2} style={{ margin: 0, display: 'inline-block', marginRight: 16 }}>
           人事数据概览
         </Title>
-        <Tag icon={<RobotOutlined />} color="purple" style={{ fontSize: 14, padding: '4px 12px' }}>
-          基于RAG的智能分析
-        </Tag>
-        <Badge status="processing" text="RAG引擎运行中" style={{ marginLeft: 16 }} />
       </div>
 
       {/* RAG系统统计 */}
@@ -155,15 +155,7 @@ const Dashboard = () => {
             />
           </Col>
           <Col xs={24} sm={12} lg={6}>
-            <Statistic
-              title="平均响应时间"
-              loading={loading}
-              value={summary.rag?.avgResponseTime ?? '-'}
-              prefix={<ThunderboltOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14' }}
-              suffix={typeof summary.rag?.avgResponseTime === 'number' ? '秒' : undefined}
-              precision={typeof summary.rag?.avgResponseTime === 'number' ? 1 : undefined}
-            />
+            {/* 平均响应时间已移除 */}
           </Col>
         </Row>
       </Card>
@@ -247,6 +239,8 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+
+      
     </div>
   )
 }

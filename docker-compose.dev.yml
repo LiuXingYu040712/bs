@@ -1,0 +1,27 @@
+# 开发模式（热更新）：docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# 源码挂载到容器，修改后自动重载
+
+services:
+  server:
+    volumes:
+      - .:/app
+      - server_node_modules:/app/node_modules
+      - server_data:/data
+    command: >
+      sh -lc "if [ ! -d node_modules ]; then apk add --no-cache python3 make g++ && npm ci --no-audit --no-fund;
+      fi; node server/index.js"
+
+  rag_service:
+    volumes:
+      - ./rag_service:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    volumes:
+      - .:/app
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  server_node_modules:
+  frontend_node_modules:

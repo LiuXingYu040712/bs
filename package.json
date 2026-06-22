@@ -5,35 +5,39 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "node ./server/index.js",
-    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Job -ScriptBlock { node ./server/index.js }; vite\"",
+    "dev:rag": "python -m uvicorn app.main:app --reload --port 8000 --app-dir rag_service",
+    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-all.ps1",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docker:up": "docker compose up -d",
+    "docker:rebuild": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml down"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "antd": "^5.12.0",
+    "axios": "^1.6.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.10",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mammoth": "^1.6.0",
+    "multer": "^1.4.5-lts.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
-    "antd": "^5.12.0",
-    "@ant-design/icons": "^5.2.6",
-    "axios": "^1.6.2",
-    "dayjs": "^1.11.10",
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "body-parser": "^1.20.2",
-    "sqlite3": "^5.1.7",
-    "openai": "^4.63.0",
-    "@qdrant/js-client-rest": "^1.8.2",
-    "multer": "^1.4.5-lts.1",
-    "pdf-parse": "^1.1.1",
-    "mammoth": "^1.6.0",
-    "dotenv": "^16.4.5"
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.8",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "vite": "^5.0.8"
   }
 }
-

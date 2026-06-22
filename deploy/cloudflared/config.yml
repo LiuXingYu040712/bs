@@ -1,0 +1,12 @@
+tunnel: qdrant
+credentials-file: deploy/cloudflared/qdrant.json
+protocol: auto
+edge-ip-version: "4"
+ingress:
+  - hostname: app.liuxingyu.fun
+    service: http://localhost:3000
+  - hostname: api.liuxingyu.fun
+    service: http://localhost:8080
+  - hostname: qdrant.liuxingyu.fun
+    service: http://localhost:6333
+  - service: http_status:404

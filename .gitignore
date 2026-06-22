@@ -14,17 +14,12 @@ pnpm-debug.log*
 .env.local
 .env.development.local
 .env.production.local
+deploy/cloudflared/qdrant.json
 
-# OS/Editor
-.DS_Store
-Thumbs.db
-.vscode/
-
-# Docker
-.dockerignore
-
-# SQLite/Qdrant data (if any local files)
-data/
+# Local data
+server/uploads/
+.tmp_docx_extract/
+server/database.sqlite
 *.sqlite
 *.db
 # Node/Vite
@@ -52,6 +47,13 @@ Thumbs.db
 
 # Build outputs
 build/
+
+# Python (rag_service)
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
 
 # Misc
 *.log# Logs

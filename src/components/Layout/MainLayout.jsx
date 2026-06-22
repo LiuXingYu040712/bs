@@ -11,14 +11,16 @@ import {
   FileSearchOutlined,
   CalendarOutlined,
   DollarOutlined,
-  SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BellOutlined,
+  MessageOutlined,
+  IdcardOutlined,
   LogoutOutlined,
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons'
+import { getFeedbackUnreadCount } from '../../api/client'
 import './MainLayout.css'
 
 const { Header, Sider, Content } = Layout
@@ -51,6 +53,7 @@ class RouteErrorBoundary extends React.Component {
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const dirtyRef = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -100,25 +103,71 @@ const MainLayout = () => {
       label: '薪资管理',
     },
     {
-      key: '/settings',
-      icon: <SettingOutlined />,
-      label: '系统设置',
+      key: '/profile',
+      icon: <IdcardOutlined />,
+      label: '个人信息中心',
+    },
+    {
+      key: '/feedback',
+      icon: <MessageOutlined />,
+      label: '意见箱',
     },
   ]
 
-  const userMenuItems = [
-    {
-      key: 'profile',
-      label: '个人资料',
-      icon: <UserOutlined />,
-    },
-    {
-      key: 'logout',
-      label: '退出登录',
-      icon: <LogoutOutlined />,
-      danger: true,
-    },
-  ]
+  let currentUser = {}
+  try {
+    if (typeof window !== 'undefined') {
+      currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}')
+    }
+  } catch (e) {
+    currentUser = {}
+  }
+  const isAdmin = currentUser && currentUser.role === 'admin'
+  const isAssistant = currentUser && currentUser.role === 'assistant'
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        navigate('/login', { replace: true })
+      }
+    } catch (e) {
+      navigate('/login', { replace: true })
+    }
+  }, [navigate])
+
+  // 根据当前登录用户角色过滤侧栏菜单：管理员显示所有，助理仅显示智能助手，其他非管理员仅显示招聘
+  let filteredMenuItems = menuItems
+  try {
+    if (isAdmin) filteredMenuItems = menuItems.filter((it) => it.key !== '/profile')
+    else if (isAssistant) filteredMenuItems = menuItems.filter((it) => it.key === '/attendance' || it.key === '/ai-assistant' || it.key === '/feedback' || it.key === '/profile')
+    else filteredMenuItems = menuItems.filter((it) => it.key === '/recruitment' || it.key === '/feedback' || it.key === '/profile')
+  } catch (e) {
+    // ignore and show full menu by default
+  }
+
+  const userMenuItems = isAdmin
+    ? [
+        {
+          key: 'logout',
+          label: '退出登录',
+          icon: <LogoutOutlined />,
+          danger: true,
+        },
+      ]
+    : [
+        {
+          key: 'profile',
+          label: '个人资料',
+          icon: <UserOutlined />,
+        },
+        {
+          key: 'logout',
+          label: '退出登录',
+          icon: <LogoutOutlined />,
+          danger: true,
+        },
+      ]
 
   const handleMenuClick = ({ key }) => {
     // 简单的全局离开拦截：若有未保存更改则提示（各页面可通过 window.__setDirty(true/false) 控制）
@@ -131,13 +180,24 @@ const MainLayout = () => {
   }
 
   const handleUserMenuClick = ({ key }) => {
+    if (key === 'profile') {
+      if (dirtyRef.current) {
+        const ok = window.confirm('当前页面有未保存的修改，确定要离开吗？')
+        if (!ok) return
+        dirtyRef.current = false
+      }
+      navigate('/profile')
+      return
+    }
     if (key === 'logout') {
       if (dirtyRef.current) {
         const ok = window.confirm('当前页面有未保存的修改，确定要退出吗？')
         if (!ok) return
         dirtyRef.current = false
       }
-      navigate('/login')
+        // 清理本地登录状态
+        try { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user') } catch (e) {}
+        navigate('/login')
     }
   }
 
@@ -158,6 +218,31 @@ const MainLayout = () => {
       delete window.__setDirty
     }
   }, [])
+
+  useEffect(() => {
+    let timer = null
+    let cancelled = false
+    const loadUnread = async () => {
+      if (!isAdmin) {
+        setUnreadCount(0)
+        return
+      }
+      try {
+        const data = await getFeedbackUnreadCount()
+        if (!cancelled) setUnreadCount(Number(data?.count || 0))
+      } catch (e) {
+        if (!cancelled) setUnreadCount(0)
+      }
+    }
+    loadUnread()
+    if (isAdmin) {
+      timer = setInterval(loadUnread, 30000)
+    }
+    return () => {
+      cancelled = true
+      if (timer) clearInterval(timer)
+    }
+  }, [isAdmin, location.pathname])
 
   return (
     <Layout className="main-layout" style={{ minHeight: '100vh' }}>
@@ -192,7 +277,7 @@ const MainLayout = () => {
           theme={darkMode ? 'dark' : 'light'}
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={menuItems}
+          items={filteredMenuItems}
           onClick={handleMenuClick}
         />
       </Sider>
@@ -221,8 +306,11 @@ const MainLayout = () => {
             >
               {darkMode ? <SunOutlined /> : <MoonOutlined />}
             </div>
-            <Badge count={5} size="small">
-              <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
+            <Badge count={isAdmin ? unreadCount : 0} size="small">
+              <BellOutlined
+                style={{ fontSize: 18, cursor: 'pointer' }}
+                onClick={() => navigate('/feedback')}
+              />
             </Badge>
             <Dropdown
               menu={{

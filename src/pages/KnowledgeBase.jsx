@@ -29,10 +29,9 @@ import {
   SyncOutlined,
   EyeOutlined,
 } from '@ant-design/icons'
-import { ingestTextFile, listKnowledgeDocs, getDocContent, deleteKnowledgeDoc } from '../api/client'
+import { ingestTextFile, listKnowledgeDocs, getDocContent, deleteKnowledgeDoc, reindexKnowledgeDoc } from '../api/client'
 
 const { Title, Text } = Typography
-const { Search } = Input
 
 const KnowledgeBase = () => {
   const [dataSource, setDataSource] = useState([])
@@ -53,9 +52,8 @@ const KnowledgeBase = () => {
           status: d.status || '已索引',
           chunks: d.chunks ?? 0,
           vectors: d.vectors ?? 0,
-          uploadTime: d.uploadTime || '-',
-          indexTime: d.indexTime || '-',
-          similarity: d.similarity ?? 0.9,
+          uploadTime: d.uploadTime ? new Date(d.uploadTime).toLocaleString('zh-CN') : '-',
+          indexTime: d.indexTime ? new Date(d.indexTime).toLocaleString('zh-CN') : '-',
         }))
         setDataSource(mapped)
       } catch (e) {
@@ -171,29 +169,17 @@ const KnowledgeBase = () => {
         </Tooltip>
       ),
     },
-    {
-      title: '平均相似度',
-      dataIndex: 'similarity',
-      key: 'similarity',
-      width: 120,
-      render: (similarity) => {
-        if (similarity === 0) return <Text type="secondary">-</Text>
-        const percent = (similarity * 100).toFixed(1)
-        return (
-          <Progress
-            type="circle"
-            percent={parseFloat(percent)}
-            size={50}
-            format={() => `${percent}%`}
-            strokeColor={similarity > 0.9 ? '#52c41a' : similarity > 0.8 ? '#1890ff' : '#faad14'}
-          />
-        )
-      },
-    },
+    
     {
       title: '上传时间',
       dataIndex: 'uploadTime',
       key: 'uploadTime',
+      width: 180,
+    },
+    {
+      title: '索引时间',
+      dataIndex: 'indexTime',
+      key: 'indexTime',
       width: 180,
     },
     {
@@ -236,7 +222,37 @@ const KnowledgeBase = () => {
             </Button>
           </Tooltip>
           <Tooltip title="重新索引">
-            <Button type="link" icon={<SyncOutlined />} />
+            <Button
+              type="link"
+              icon={<SyncOutlined />}
+              onClick={async () => {
+                try {
+                  setLoading(true)
+                  setDataSource((prev) => prev.map((p) => (p.id === record.id ? { ...p, status: '索引中' } : p)))
+                  await reindexKnowledgeDoc(record.id)
+                  const docs = await listKnowledgeDocs()
+                  const mapped = docs.map((d, idx) => ({
+                    key: String(idx + 1),
+                    id: d.id,
+                    name: d.name,
+                    type: d.type || d.name.split('.').pop().toUpperCase(),
+                    size: d.size || '-',
+                    status: d.status || '已索引',
+                    chunks: d.chunks ?? 0,
+                    vectors: d.vectors ?? 0,
+                    uploadTime: d.uploadTime ? new Date(d.uploadTime).toLocaleString('zh-CN') : '-',
+                    indexTime: d.indexTime ? new Date(d.indexTime).toLocaleString('zh-CN') : '-',
+                  }))
+                  setDataSource(mapped)
+                  message.success('重新索引完成')
+                } catch (e) {
+                  console.error(e)
+                  message.error(e?.response?.data?.error || e?.message || '重新索引失败')
+                } finally {
+                  setLoading(false)
+                }
+              }}
+            />
           </Tooltip>
           <Popconfirm
             title="确定要删除这个文档吗？"
@@ -257,9 +273,8 @@ const KnowledgeBase = () => {
                   status: d.status || '已索引',
                   chunks: d.chunks ?? 0,
                   vectors: d.vectors ?? 0,
-                  uploadTime: d.uploadTime || '-',
-                  indexTime: d.indexTime || '-',
-                  similarity: d.similarity ?? 0.9,
+                  uploadTime: d.uploadTime ? new Date(d.uploadTime).toLocaleString('zh-CN') : '-',
+                  indexTime: d.indexTime ? new Date(d.indexTime).toLocaleString('zh-CN') : '-',
                 }))
                 setDataSource(mapped)
                 message.success('删除成功')
@@ -324,9 +339,8 @@ const KnowledgeBase = () => {
         status: '已索引',
         chunks: d.chunks ?? 0,
         vectors: d.vectors ?? 0,
-        uploadTime: d.uploadTime || new Date().toLocaleString('zh-CN'),
-        indexTime: d.indexTime || '-',
-        similarity: d.similarity ?? 0.9,
+        uploadTime: d.uploadTime ? new Date(d.uploadTime).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN'),
+        indexTime: d.indexTime ? new Date(d.indexTime).toLocaleString('zh-CN') : '-',
       }))
       setDataSource(mapped)
     } catch (e) {
@@ -389,7 +403,7 @@ const KnowledgeBase = () => {
           <Alert type="error" message={loadError} showIcon style={{ marginBottom: 12 }} />
         )}
         <div style={{ marginBottom: 16 }}>
-          <Search
+          <Input
             placeholder="搜索文档名称、类型"
             allowClear
             style={{ width: 300 }}

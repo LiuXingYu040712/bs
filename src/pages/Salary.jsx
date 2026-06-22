@@ -9,6 +9,7 @@ import {
   Input,
   Select,
   Modal,
+  Popconfirm,
   Form,
   InputNumber,
   Row,
@@ -18,10 +19,9 @@ import {
 } from 'antd'
 import { SearchOutlined, EditOutlined, DollarOutlined, ExportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { listSalaries, updateSalary } from '../api/client'
+import { listSalaries, updateSalary, deleteSalary } from '../api/client'
 
 const { Title } = Typography
-const { Search } = Input
 
 const Salary = () => {
   const [dataSource, setDataSource] = useState([])
@@ -126,13 +126,25 @@ const Salary = () => {
       key: 'action',
       width: 100,
       render: (_, record) => (
-        <Button
-          type="link"
-          icon={<EditOutlined />}
-          onClick={() => handleEdit(record)}
-        >
-          编辑
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确认删除该薪资记录吗？"
+            okText="删除"
+            cancelText="取消"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button type="link" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ]
@@ -162,6 +174,15 @@ const Salary = () => {
         })
         .catch(() => {})
     })
+  }
+
+  const handleDelete = (id) => {
+    if (!id) return
+    deleteSalary(id)
+      .then(() => {
+        setDataSource((prev) => prev.filter((it) => it.id !== id))
+      })
+      .catch(() => {})
   }
 
   const totalStats = useMemo(() => {
@@ -215,7 +236,7 @@ const Salary = () => {
               )
             })}
           </Select>
-          <Search
+          <Input
             placeholder="搜索员工"
             allowClear
             style={{ width: 250 }}

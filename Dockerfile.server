@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# sqlite3 原生编译需要：node-gyp + Python setuptools(distutils)
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories || true \
+    && apk add --no-cache python3 make g++ py3-setuptools
+
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; else npm install --omit=dev --no-audit --no-fund; fi
+
+COPY server ./server
+
+ENV NODE_ENV=production
+EXPOSE 8080
+
+CMD ["node", "server/index.js"]

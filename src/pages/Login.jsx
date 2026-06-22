@@ -1,8 +1,9 @@
 import React from 'react'
-import { Form, Input, Button, Card, Typography, message, Tag } from 'antd'
-import { UserOutlined, LockOutlined, RobotOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { Form, Input, Button, Card, Typography, message } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { useNavigate, Link } from 'react-router-dom'
 import './Login.css'
+import { authLogin } from '../api/client'
 
 const { Title } = Typography
 
@@ -11,29 +12,38 @@ const Login = () => {
   const [form] = Form.useForm()
 
   const onFinish = (values) => {
-    console.log('Login values:', values)
-    message.success('登录成功')
-    setTimeout(() => {
-      navigate('/dashboard')
-    }, 500)
+    authLogin(values)
+      .then((data) => {
+        if (data?.token) {
+          localStorage.setItem('auth_token', data.token)
+          localStorage.setItem('auth_user', JSON.stringify(data.user || {}))
+          message.success('登录成功')
+          setTimeout(() => {
+            try {
+              const role = (data.user && data.user.role) || (JSON.parse(localStorage.getItem('auth_user') || '{}').role)
+              if (role === 'admin') navigate('/dashboard')
+              else if (role === 'assistant') navigate('/attendance')
+              else navigate('/recruitment')
+            } catch (e) {
+              navigate('/recruitment')
+            }
+          }, 400)
+        } else {
+          message.error('登录失败')
+        }
+      })
+      .catch((e) => {
+        message.error(e?.response?.data?.error || e.message || '登录失败')
+      })
   }
 
   return (
     <div className="login-container">
       <Card className="login-card">
         <div className="login-header">
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <RobotOutlined style={{ fontSize: 48, color: '#667eea', marginBottom: 16 }} />
-          </div>
-          <Title level={2} style={{ textAlign: 'center', marginBottom: 8 }}>
-            AI人事管理系统
+          <Title level={3} style={{ textAlign: 'center', marginBottom: 8, color: '#333' }}>
+            登录
           </Title>
-          <p style={{ textAlign: 'center', color: '#666', marginBottom: 8 }}>
-            基于大模型与RAG技术
-          </p>
-          <Tag icon={<RobotOutlined />} color="purple" style={{ marginBottom: 32 }}>
-            智能人事助手
-          </Tag>
         </div>
         <Form
           form={form}
@@ -68,8 +78,9 @@ const Login = () => {
             </Button>
           </Form.Item>
         </Form>
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#999' }}>
-          <p>默认账号: admin / 密码: admin</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+          <div style={{ color: '#666', fontSize: '14px' }}>没有账号？ <Link to="/register">注册</Link></div>
+          <div style={{ color: '#999', fontSize: '12px' }}>默认账号: admin / 密码: admin123</div>
         </div>
       </Card>
     </div>

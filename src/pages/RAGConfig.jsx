@@ -31,22 +31,42 @@ const RAGConfig = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [initialLoaded, setInitialLoaded] = useState(false)
+  const [initialValues, setInitialValues] = useState({
+    vectorModel: 'text-embedding-v4',
+    vectorDimension: 1024,
+    vectorProvider: 'dashscope',
+    chunkSize: 800,
+    chunkOverlap: 50,
+    topK: 8,
+    similarityThreshold: 0.35,
+    temperature: 0.2,
+    maxTokens: 1000,
+    retrievalMode: 'hybrid',
+    rerankEnabled: false,
+    strictKbOnly: true,
+    llmProvider: 'dashscope',
+    llmModel: 'qwen-plus',
+    vectorDatabase: 'qdrant',
+  })
 
   useEffect(() => {
     async function load() {
       try {
         const mod = await import('../api/client')
         const cfg = await mod.getRagConfig()
-        form.setFieldsValue({
+        setInitialValues({
           vectorModel: cfg.vectorModel || 'text-embedding-v4',
-          chunkSize: cfg.chunkSize || 500,
+          vectorDimension: cfg.vectorDimension || 1024,
+          vectorProvider: cfg.vectorProvider || 'dashscope',
+          chunkSize: cfg.chunkSize || 800,
           chunkOverlap: cfg.chunkOverlap || 50,
-          topK: cfg.topK || 5,
-          similarityThreshold: cfg.similarityThreshold || 0.7,
-          temperature: cfg.temperature || 0.2,
+          topK: cfg.topK || 8,
+          similarityThreshold: cfg.similarityThreshold ?? 0.35,
+          temperature: cfg.temperature ?? 0.2,
           maxTokens: cfg.maxTokens || 1000,
-          retrievalMode: cfg.retrievalMode || 'vector',
-          rerankEnabled: cfg.rerankEnabled ?? true,
+          retrievalMode: cfg.retrievalMode || 'hybrid',
+          rerankEnabled: cfg.rerankEnabled ?? false,
+          strictKbOnly: cfg.strictKbOnly ?? true,
           llmProvider: cfg.llmProvider || 'dashscope',
           llmModel: cfg.llmModel || 'qwen-plus',
           vectorDatabase: 'qdrant',
@@ -97,21 +117,7 @@ const RAGConfig = () => {
         form={form}
         layout="vertical"
         onFinish={onFinish}
-        initialValues={{
-          vectorModel: 'text-embedding-v4',
-          vectorProvider: 'dashscope',
-          chunkSize: 500,
-          chunkOverlap: 50,
-          topK: 5,
-          similarityThreshold: 0.7,
-          temperature: 0.2,
-          maxTokens: 1000,
-          retrievalMode: 'vector',
-          rerankEnabled: true,
-          llmProvider: 'dashscope',
-          llmModel: 'qwen-plus',
-          vectorDatabase: 'qdrant',
-        }}
+        initialValues={initialValues}
       >
         <Card
           title={
@@ -148,7 +154,7 @@ const RAGConfig = () => {
                   style={{ width: '100%' }}
                   min={128}
                   max={4096}
-                  defaultValue={1024}
+                    // 使用 Form.initialValues 来设置默认值，移除 defaultValue
                 />
               </Form.Item>
             </Col>
@@ -269,7 +275,7 @@ const RAGConfig = () => {
               <Form.Item
                 name="similarityThreshold"
                 label="相似度阈值"
-                tooltip="低于此阈值的文档块将被过滤"
+                tooltip="向量相似度低于此值的片段会被过滤。中文问答建议 0.3–0.5，过高易漏检"
               >
                 <Slider
                   min={0}
@@ -300,7 +306,15 @@ const RAGConfig = () => {
             name="rerankEnabled"
             label="重排序"
             valuePropName="checked"
-            tooltip="启用重排序可以进一步提升检索结果的相关性"
+            tooltip="按相似度分数二次排序（非 cross-encoder 重排模型）"
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="strictKbOnly"
+            label="严格知识库模式"
+            valuePropName="checked"
+            tooltip="开启后仅依据检索片段作答，无命中则拒答，防止幻觉"
           >
             <Switch />
           </Form.Item>
@@ -385,7 +399,7 @@ const RAGConfig = () => {
               min={500}
               max={8000}
               step={500}
-              defaultValue={4000}
+              // 使用 Form.initialValues 来设置默认值，移除 defaultValue
             />
           </Form.Item>
           <Form.Item

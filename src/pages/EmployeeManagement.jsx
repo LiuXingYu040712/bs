@@ -29,11 +29,11 @@ import {
 import { getEmployees, addEmployee, updateEmployee, deleteEmployee } from '../api/client'
 
 const { Title } = Typography
-const { Search } = Input
 
 const EmployeeManagement = () => {
   const [dataSource, setDataSource] = useState([])
   const [loading, setLoading] = useState(false)
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   useEffect(() => {
     fetchEmployees()
@@ -56,6 +56,19 @@ const EmployeeManagement = () => {
       setDataSource(data.map(item => ({ ...item, key: item.id })))
     } catch (error) {
       message.error('获取员工列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 支持按关键字从后端搜索（姓名/部门/职位）
+  const handleSearch = async (value) => {
+    setLoading(true)
+    try {
+      const data = await getEmployees(value && String(value).trim())
+      setDataSource((data || []).map(item => ({ ...item, key: item.id })))
+    } catch (err) {
+      message.error('搜索失败')
     } finally {
       setLoading(false)
     }
@@ -278,12 +291,21 @@ const EmployeeManagement = () => {
           员工管理
         </Title>
         <Space>
-          <Search
-            placeholder="搜索员工姓名、部门、职位"
-            allowClear
-            style={{ width: 300 }}
-            prefix={<SearchOutlined />}
-          />
+          <Space.Compact style={{ width: 300 }}>
+            <Input
+              placeholder="搜索员工姓名、部门、职位"
+              allowClear
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onPressEnter={() => handleSearch(searchKeyword)}
+              prefix={<SearchOutlined />}
+            />
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={() => handleSearch(searchKeyword)}
+            />
+          </Space.Compact>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             添加员工
           </Button>
